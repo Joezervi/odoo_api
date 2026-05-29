@@ -5,20 +5,19 @@ from typing import Optional
 
 import requests
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-
 from app.auth.api.route_name import Route
 from app.auth.auth import generate_jwt_token, validate_token
 from app.auth.models.models import OdooUserCredentials, Token, TokenData, User
 from app.auth.schemas.schemas import OdooAuthResponse, SyncResponse
-from app.auth.session_auth import require_odoo_session
+from app.auth.session_auth import require_odoo_session, safe_cookie_key
 from app.auth.utils import (
     create_access_token,
     verify_token,
 )
 from app.config import settings
 from app.odoo.client import OdooClient
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -103,7 +102,9 @@ odoo_router = APIRouter(
 
 
 @odoo_router.post(Route.odoo_login)
-async def odoo_login(credentials: OdooUserCredentials, request: Request, response: Response):
+async def odoo_login(
+    credentials: OdooUserCredentials, request: Request, response: Response
+):
     """Authenticate with Odoo and get JWT token with session cookie"""
     try:
         # Create Odoo client and authenticate
@@ -149,13 +150,16 @@ async def odoo_login(credentials: OdooUserCredentials, request: Request, respons
 
         # Set both JWT token and user_id cookies
         response.set_cookie(
-            key=f"odoo_token_{credentials.odoo_username}",
+            key=f"odoo_token_{safe_cookie_key(credentials.odoo_username)}",
             value=access_token,
             httponly=True,
             secure=is_https,
             samesite="none" if is_https else "lax",
             max_age=24 * 60 * 60,  # 24 hours
             path="/",
+        )
+        logger.info(
+            f"Odoo authentication set_cookie : key = odoo_token_{safe_cookie_key(credentials.odoo_username)}"
         )
 
         # Store user_id in cookie for session-based authentication

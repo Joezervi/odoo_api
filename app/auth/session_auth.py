@@ -1,6 +1,7 @@
 """Session-based Odoo authentication middleware"""
 
 from typing import Optional
+from urllib.parse import quote
 
 import structlog
 from fastapi import Depends, HTTPException, Request, status
@@ -11,6 +12,17 @@ from app.odoo.client import session_odoo_client
 from app.auth.utils import verify_token
 
 logger = structlog.get_logger()
+
+
+def safe_cookie_key(username: str) -> str:
+    """Percent-encode a username so it is safe for use in an HTTP cookie name.
+
+    RFC 6265 restricts cookie-name to the ``token`` production, which excludes
+    separators like ``@``, ``(``, ``)``, etc.  ``urllib.parse.quote`` with
+    ``safe=''`` encodes every character that is not an unreserved character
+    (A-Z a-z 0-9 - _ . ~), producing a unique, reversible key.
+    """
+    return quote(username, safe='')
 
 
 async def get_odoo_session_user(request: Request) -> Optional[User]:
@@ -76,7 +88,7 @@ async def get_session_odoo_connection(request: Request, login: str):
     Uses user_id from cookie for authentication.
     """
     # Get user_id from cookie
-    token = request.cookies.get(f"odoo_token_{login}")
+    token = request.cookies.get(f"odoo_token_{safe_cookie_key(login)}")
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
