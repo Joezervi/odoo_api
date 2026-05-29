@@ -1,13 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/index.py": {
-      "memory": 512,
-      "maxDuration": 60
-    }
-  },
-  "buildCommand": "cd sku_check_web && npm install && npm run build",
-  "outputDirectory": "sku_check_web/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/docs", "destination": "/api/index" },
