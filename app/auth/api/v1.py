@@ -146,9 +146,10 @@ async def odoo_login(credentials: OdooUserCredentials, response: Response):
             key=f"odoo_token_{credentials.odoo_username}",
             value=access_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
+            secure=not settings.DEBUG,  # True in production (HTTPS required for samesite=none)
+            samesite="none" if not settings.DEBUG else "lax",
             max_age=24 * 60 * 60,  # 24 hours
+            path="/",
         )
 
         # Store user_id in cookie for session-based authentication
@@ -156,9 +157,10 @@ async def odoo_login(credentials: OdooUserCredentials, response: Response):
             key="odoo_user_id",
             value=str(uid),
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
+            secure=not settings.DEBUG,  # True in production (HTTPS required for samesite=none)
+            samesite="none" if not settings.DEBUG else "lax",
             max_age=24 * 60 * 60,  # 24 hours
+            path="/",
         )
 
         return OdooAuthResponse(
