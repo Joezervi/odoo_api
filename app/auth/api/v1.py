@@ -194,6 +194,33 @@ async def odoo_login(
         )
 
 
+@odoo_router.get("/session")
+async def check_session(request: Request, login: str):
+    """Check if a valid Odoo session cookie exists for the given login.
+
+    Called by the frontend on mount to restore a session after a page
+    refresh.  Reads the httponly ``odoo_token_{login}`` cookie, validates
+    the JWT, and returns the decoded user identity on success.
+    """
+    token = request.cookies.get(f"odoo_token_{safe_cookie_key(login)}")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No active session",
+        )
+    try:
+        token_data = verify_token(token)
+        return {
+            "odoo_username": token_data.odoo_username,
+            "odoo_user_id": token_data.user_id,
+        }
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or invalid",
+        )
+
+
 @odoo_router.get(Route.me, response_model=User)
 async def read_users_me(current_user: User = Depends(require_odoo_session)):
     return current_user
