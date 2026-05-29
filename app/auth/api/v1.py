@@ -103,7 +103,7 @@ odoo_router = APIRouter(
 
 
 @odoo_router.post(Route.odoo_login)
-async def odoo_login(credentials: OdooUserCredentials, response: Response):
+async def odoo_login(credentials: OdooUserCredentials, request: Request, response: Response):
     """Authenticate with Odoo and get JWT token with session cookie"""
     try:
         # Create Odoo client and authenticate
@@ -141,13 +141,19 @@ async def odoo_login(credentials: OdooUserCredentials, response: Response):
             expires_delta=access_token_expires,
         )
 
+        # Detect HTTPS for cookie security (Vercel sets X-Forwarded-Proto: https)
+        is_https = (
+            request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+            or request.url.scheme == "https"
+        )
+
         # Set both JWT token and user_id cookies
         response.set_cookie(
             key=f"odoo_token_{credentials.odoo_username}",
             value=access_token,
             httponly=True,
-            secure=not settings.DEBUG,  # True in production (HTTPS required for samesite=none)
-            samesite="none" if not settings.DEBUG else "lax",
+            secure=is_https,
+            samesite="none" if is_https else "lax",
             max_age=24 * 60 * 60,  # 24 hours
             path="/",
         )
@@ -157,8 +163,8 @@ async def odoo_login(credentials: OdooUserCredentials, response: Response):
             key="odoo_user_id",
             value=str(uid),
             httponly=True,
-            secure=not settings.DEBUG,  # True in production (HTTPS required for samesite=none)
-            samesite="none" if not settings.DEBUG else "lax",
+            secure=is_https,
+            samesite="none" if is_https else "lax",
             max_age=24 * 60 * 60,  # 24 hours
             path="/",
         )
